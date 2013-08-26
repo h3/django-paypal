@@ -1,31 +1,33 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from string import split as L
+from django.conf import settings
 from django.db import models
 from django.utils.http import urlencode
 from django.forms.models import model_to_dict
-from django.contrib.auth.models import User
 try:
     from idmapper.models import SharedMemoryModel as Model
 except ImportError:
     Model = models.Model
 
+
 class PayPalNVP(Model):
     """Record of a NVP interaction with PayPal."""
     TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"  # 2009-02-03T17:47:41Z
-    RESTRICTED_FIELDS = L("expdate cvv2 acct")
-    ADMIN_FIELDS = L("id user flag flag_code flag_info query response created_at updated_at ")
-    ITEM_FIELDS = L("amt custom invnum")
-    DIRECT_FIELDS = L("firstname lastname street city state countrycode zip")
+    RESTRICTED_FIELDS = ['expdate', 'cvv2', 'acct']
+    ADMIN_FIELDS = ['id', 'user', 'flag flag_code', 'flag_info', 'query',
+                    'response', 'created_at', 'updated_at']
+    ITEM_FIELDS = ['amt', 'custom', 'invnum']
+    DIRECT_FIELDS = ['firstname', 'lastname', 'street', 'city', 'state',
+                     'countrycode', 'zip']
 
     # Response fields
     method = models.CharField(max_length=64, blank=True)
     ack = models.CharField(max_length=32, blank=True)
     profilestatus = models.CharField(max_length=32, blank=True)
     timestamp = models.DateTimeField(blank=True, null=True)
-    profileid = models.CharField(max_length=32, blank=True)  # I-E596DFUSD882
-    profilereference = models.CharField(max_length=128, blank=True)  # PROFILEREFERENCE
-    correlationid = models.CharField(max_length=32, blank=True) # 25b380cda7a21
+    profileid = models.CharField(max_length=32, blank=True)
+    profilereference = models.CharField(max_length=128, blank=True)
+    correlationid = models.CharField(max_length=32, blank=True)
     token = models.CharField(max_length=64, blank=True)
     payerid = models.CharField(max_length=64, blank=True)
 
@@ -35,7 +37,7 @@ class PayPalNVP(Model):
     street = models.CharField("Street Address", max_length=255, blank=True)
     city = models.CharField("City", max_length=255, blank=True)
     state = models.CharField("State", max_length=255, blank=True)
-    countrycode = models.CharField("Country", max_length=2,blank=True)
+    countrycode = models.CharField("Country", max_length=2, blank=True)
     zip = models.CharField("Postal / Zip Code", max_length=32, blank=True)
 
     # Custom fields
@@ -43,7 +45,7 @@ class PayPalNVP(Model):
     custom = models.CharField(max_length=255, blank=True)
 
     # Admin fields
-    user = models.ForeignKey(User, blank=True, null=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True)
     flag = models.BooleanField(default=False, blank=True)
     flag_code = models.CharField(max_length=32, blank=True)
     flag_info = models.TextField(blank=True)
@@ -64,7 +66,8 @@ class PayPalNVP(Model):
             self.user = request.user
 
         # No storing credit card info.
-        query_data = dict((k,v) for k, v in paypal_request.iteritems() if k not in self.RESTRICTED_FIELDS)
+        query_data = dict((k, v) for k, v in paypal_request.iteritems()
+                          if k not in self.RESTRICTED_FIELDS)
         self.query = urlencode(query_data)
         self.response = urlencode(paypal_response)
 
@@ -74,7 +77,9 @@ class PayPalNVP(Model):
             if ack == "SuccessWithWarning":
                 self.flag_info = paypal_response.get('l_longmessage0', '')
             else:
-                self.set_flag(paypal_response.get('l_longmessage0', ''), paypal_response.get('l_errorcode', ''))
+                self.set_flag(
+                    paypal_response.get('l_longmessage0', ''),
+                    paypal_response.get('l_errorcode', ''))
 
     def set_flag(self, info, code=None):
         """Flag this instance for investigation."""
